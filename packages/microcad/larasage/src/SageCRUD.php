@@ -7,7 +7,7 @@ use GuzzleHttp\RequestOptions;
 
 class SageCRUD implements ArrayAccess
 {
-    static protected $endpoint;
+    static protected  $endpoint;
     protected $data;
 
     public function &__get ($key) {
@@ -33,6 +33,7 @@ class SageCRUD implements ArrayAccess
     public function toArray() {
         return $this->data;
     }
+
     public function offsetSet($offset, $value)
     {
         if (is_null($offset)) {
@@ -69,44 +70,53 @@ class SageCRUD implements ArrayAccess
         return $this->data;
     }
     static function create($data) {
-
         $client = new GClient();
-
-        $response = $client->post(config("larasage.url" . self::$endpoint), [
+        $response = $client->post(config("larasage.url" . static::$endpoint), [
             RequestOptions::AUTH => [self::getUsername(),self::getPassword()],
             RequestOptions::JSON => $data
         ]);
+        $instance = new self;
 
-        return $response->getBody();
+        $instance->data = json_decode($response->getBody(), true);
+        return $instance;
 
     }
 
-    public function find($id) {
+    public static function find($id) {
         $client = new GClient();
-        $response = $client->get(config(), [
-            GuzzleHttp\RequestOptions::AUTH => [self::getUsername(),self::getPassword()],
-            GuzzleHttp\RequestOptions::JSON => $this->data,
+        $uri = config("larasage.url" ) . static::$endpoint . "('" . $id . "')";
+        $response = $client->get($uri, [
+            RequestOptions::AUTH => [self::getUsername(),self::getPassword()],
+            RequestOptions::HTTP_ERRORS => false
         ]);
 
-        return $response->getBody();
+        if($response->getStatusCode() !== 200) {
+            return null;
+        }
+
+        $instance = new static;
+        $instance->data = json_decode($response->getBody(), true);
+        return $instance;
     }
 
-    function delete() {
+    public function save() {
         $client = new GClient();
-        $response = $client->delete(config(), [
-            GuzzleHttp\RequestOptions::AUTH => [self::getUsername(),self::getPassword()],
-            GuzzleHttp\RequestOptions::JSON => $this->data,
+        $uri = config("larasage.url" ) . static::$endpoint . "('" . $this->data['CustomerNumber'] . "')";
+        $response = $client->put($uri, [
+            RequestOptions::AUTH => [self::getUsername(),self::getPassword()],
+            RequestOptions::JSON => $this->data
         ]);
-
-        return $response->getBody();
+        return;
     }
 
     static function getUsername() {
-        return substr(config("SAGE_KEY"), 0, strpos(config("SAGE_KEY"), ':'));
+        $apikey = config("larasage.api_key");
+        return substr($apikey, 0, strpos($apikey, ':'));
     }
 
     static function getPassword() {
-        return substr(config("SAGE_KEY"), strpos(config("SAGE_KEY"), ':') + 1, -1);
+        $apikey = config("larasage.api_key");
+        return substr($apikey, strpos($apikey, ':') + 1, strlen($apikey));
     }
 
 
